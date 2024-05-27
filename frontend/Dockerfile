@@ -1,7 +1,9 @@
 FROM node:16 as bulider
 WORKDIR /app
-COPY . .
+COPY package*.json .
 RUN npm install
+COPY . .
+
 
 FROM node:16-alpine
 WORKDIR /final_app
