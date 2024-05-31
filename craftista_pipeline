@@ -1,0 +1,58 @@
+pipeline {
+    agent any
+    
+    tools{
+        jdk 'jdk17'
+    }
+  
+    environment {
+        DOCKER_BUILDKIT = '0'
+        DOCKER_CREDENTIALS = 'docker-id-pass'
+        DOCKER_IMAGE = 'harshal6969/frontend'
+        IMAGE_VERSION = 'v1'
+        DOCKER_PATH = 'craftista/frontend/Dockerfile'
+        SONAR_HOME = tool 'sonar-init'
+        PATH = "${env.PATH}:${SONAR_HOME}/bin" 
+    }
+    
+    stages {
+        stage('cloning') {
+            steps {
+                echo "cloning the repo ${DOCKER_IMAGE}"
+                git branch: 'main', url: 'https://github.com/harshal-stack/craftista.git'
+            }
+        }
+        stage('buliding-docker-image') {
+            steps {
+                echo 'buliding the docker image'
+                sh "docker build -t ${DOCKER_IMAGE}:${IMAGE_VERSION} -f ${DOCKER_PATH}"
+            }
+        }
+        stage('code-scanning') {
+            steps {
+                withSonarQubeEnv('sonar-server') {
+                    sh """
+                    sonar-scanner \
+                    -Dsonar.projectName=craftista \
+                    -Dsonar.projectKey=craftista \
+                    -Dsonar.sources.binaries=. \
+                    -Dsonar.exclusions=**/*.java
+                    """
+                
+                }
+            }
+        }
+        
+        stage('pushing to docker-hub'){
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'docker-id-pass', passwordVariable: 'docker-password', usernameVariable: 'docker-username')]) {
+                    sh ''' docker login -u $docker-username -p $docker-password
+                            docker push ${DOCKER_IMAGE}:${env.BUILD_NUMBER}
+                    '''
+                 }
+            }
+            
+        }
+    }
+}
+
